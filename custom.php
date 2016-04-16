@@ -514,5 +514,29 @@ $custom = array(
       'trigger_table' => 'civicrm_participant',
       'display' => 'event_turnout',
     ),
+
+		'volunteer_total_hours_last_year' => array(
+			'label' => ts('Total number of Volunteer hours over the last 12 months', array('domain' => 'net.ourpowerbase.sumfields')),
+			'data_type' => 'Number',
+			'html_type' => 'Text',
+			'is_required' => '0',
+			'is_searchable' => '1',
+			'is_search_range' => '1',
+			'weight' => '121',
+			'is_active' => '1',
+			'is_view' => '1',
+			'text_length' => '32',
+
+			'trigger_sql' => '(SELECT COALESCE(SUM(duration),0)
+				FROM civicrm_activity t1
+				JOIN civicrm_activity_contact t3 ON t1.id = t3.activity_id AND t3.record_type_id = %activity_assignee_record_type
+				WHERE t1.activity_type_id = %volunteer_activity_type AND
+				CAST(t1.activity_date_time AS DATE) >= "%previous_12_months" AND
+				t3.contact_id = t2.contact_id AND
+				t1.is_deleted = 0)',
+			'trigger_table' => 'civicrm_activity_contact',
+			'display' => 'volunteer',
+		),
+
   ),
 );
