@@ -183,6 +183,34 @@ function sumfields_sql_rewrite($sql) {
     // This is an error - we have a variable we can't replace.
     return FALSE;
   }
+
+  $volunteer_activity_type = sumfields_volunteer_activity_id();
+  if($volunteer_activity_type) {
+    $sql = str_replace('%volunteer_activity_type', $volunteer_activity_type, $sql);
+  }
+  elseif(preg_match('/%volunteer_activity_type/', $sql)) {
+    // This is an error - we have a variable we can't replace.
+    return FALSE;
+  }
+
+  $previous_12_months = sumfields_previous_12_months();
+  if($previous_12_months) {
+    $sql = str_replace('%previous_12_months', $previous_12_months, $sql);
+  }
+  elseif(preg_match('/%previous_12_months/', $sql)) {
+    // This is an error - we have a variable we can't replace.
+    return FALSE;
+  }
+
+  $activity_assignee_record_type = sumfields_activity_assignee_record_type();
+  if($activity_assignee_record_type) {
+    $sql = str_replace('%activity_assignee_record_type', $activity_assignee_record_type, $sql);
+  }
+  elseif(preg_match('/%activity_assignee_record_type/', $sql)) {
+    // This is an error - we have a variable we can't replace.
+    return FALSE;
+  }
+
   return $sql;
 }
 
@@ -243,6 +271,10 @@ function sumfields_get_fiscal_dates() {
 function sumfields_zero_pad($num) {
   if(strlen($num) == 1) return '0' . $num;
   return $num;
+}
+
+function sumfields_previous_12_months() {
+  return date('Y-m-d', strtotime('-1 year'));
 }
 
 /**
@@ -369,6 +401,9 @@ function sumfields_create_temporary_table($trigger_table) {
         elseif($data_type == 'String') {
           $data_type = 'varchar(128)';
         }
+        elseif($data_type == 'Number') {
+          $data_type = 'Decimal';
+        }
         $create_fields[] = "`$field_name` $data_type";
       }
     }
@@ -418,6 +453,9 @@ function sumfields_generate_data_based_on_current_data($session = NULL) {
   $participant_sql = NULL;
   $participant_sql_parts = array();
   $participant_sql_parts[] = 'contact_id';
+  $activity_sql = NULL;
+  $activity_sql_parts = array();
+  $activity_sql_parts[] = 'contact_id';
 
   // Variables used for building the final insert statement into the actual
   // summary fields table
@@ -436,7 +474,12 @@ function sumfields_generate_data_based_on_current_data($session = NULL) {
     $participant_sql = "INSERT INTO `$participant_temp_table` SELECT ";
   }
 
-  if(is_null($contribution_sql) && is_null($participant_sql)) {
+  if(sumfields_are_any_activity_fields_active()) {
+    $activity_temp_table = sumfields_create_temporary_table('civicrm_activity_contact');
+    $activity_sql = "INSERT INTO `$activity_temp_table` SELECT ";
+  }
+
+  if(is_null($contribution_sql) && is_null($participant_sql) && is_null($activity_sql)) {
     // Is this an error? Not sure. But it will be an error if we let this
     // function continue - it will produce a broken sql statement, so we
     // short circuit here.
@@ -467,6 +510,9 @@ function sumfields_generate_data_based_on_current_data($session = NULL) {
     elseif($table == 'civicrm_contribution') {
       $contribution_sql_parts[] = $trigger;
     }
+    elseif($table == 'civicrm_activity_contact') {
+      $activity_sql_parts[] = $trigger;
+    }
     // For the final query, we just need the field name
     $final_sql_parts[] = $base_column_name;
   }
@@ -490,8 +536,33 @@ function sumfields_generate_data_based_on_current_data($session = NULL) {
     CRM_Core_DAO::executeQuery($participant_sql);
     // echo "$participant_sql\n\n";
   }
+  if(!is_null($activity_sql)) {
+    $activity_sql .= implode(",\n", $activity_sql_parts);
+    $activity_sql .= ' FROM `civicrm_activity_contact` AS t2 ';
+    $activity_sql .= "JOIN civicrm_contact AS c ON t2.contact_id = c.id ";
+    $activity_sql .= ' GROUP BY contact_id';
+    CRM_Core_DAO::executeQuery($activity_sql);
+    // echo "$participant_sql\n\n";
+  }
   $final_fields = implode(",\n", $final_sql_parts);
-  if(!is_null($contribution_sql) && !is_null($participant_sql)) {
+  if(!is_null($contribution_sql) && !is_null($participant_sql) && !is_null($activity_sql)) {
+    $final_sql .= " SELECT $final_fields FROM `$activity_temp_table` a ".
+      "LEFT JOIN `$participant_temp_table` t USING(contact_id) ".
+      "LEFT JOIN `$contribution_temp_table` c USING(contact_id) ";
+  }
+  elseif(!is_null($activity_sql) && !is_null($participant_sql)) {
+    $final_sql .= " SELECT $final_fields FROM `$activity_temp_table` a LEFT JOIN ".
+      "`$participant_temp_table` t USING(contact_id) UNION SELECT $final_fields FROM ".
+      "`$participant_temp_table` p LEFT JOIN `$activity_temp_table` a USING(contact_id) ".
+      "WHERE a.contact_id IS NULL";
+  }
+  elseif(!is_null($contribution_sql) && !is_null($activity_sql)) {
+    $final_sql .= " SELECT $final_fields FROM `$contribution_temp_table` c LEFT JOIN ".
+      "`$activity_temp_table` t USING(contact_id) UNION SELECT $final_fields FROM ".
+      "`$activity_temp_table` p LEFT JOIN `$contribution_temp_table` c USING(contact_id) ".
+      "WHERE c.contact_id IS NULL";
+  }
+  elseif(!is_null($contribution_sql) && !is_null($participant_sql)) {
     // We have both a contribution and participant table to deal with - this
     // will require a more complicated UNION query to pull them both together
     // into the summary fields table.
@@ -503,6 +574,10 @@ function sumfields_generate_data_based_on_current_data($session = NULL) {
   elseif(!is_null($participant_sql)) {
     // Only participant fields.
     $final_sql .= "(SELECT $final_fields FROM `$participant_temp_table`)";
+  }
+  elseif(!is_null($activity_sql)) {
+    // Only participant fields.
+    $final_sql .= "(SELECT $final_fields FROM `$activity_temp_table`)";
   }
   elseif(!is_null($contribution_sql)) {
     // Only contribution fields.
@@ -555,6 +630,27 @@ function sumfields_are_any_contribution_fields_active() {
   }
   return FALSE;
 }
+
+/**
+ * Helper function to see if any of the activity fields
+ * are active.
+ **/
+function sumfields_are_any_activity_fields_active() {
+// Fields chosen by the user
+  $active_fields = sumfields_get_setting('active_fields', array());
+  // All custom field definitions.
+  $custom = sumfields_get_custom_field_definitions();
+  // Iterate over our active fields looking for ones using the
+  // civicrm_contribution table.
+  while(list(,$base_column_name) = each($active_fields)) {
+    $table = $custom['fields'][$base_column_name]['trigger_table'];
+    if($table == 'civicrm_activity_contact') {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 /**
  * Create custom fields - should be called on enable.
  **/
@@ -1325,5 +1421,58 @@ function sumfields_civicrm_merge($type, &$data, $mainId = NULL, $otherId = NULL,
         unset($data['fields_in_conflict'][$check_key]);
       }
     }
+  }
+}
+
+
+/**
+ * Utility function to decide if volunteer is installed
+ */
+function sumfields_volunteer_installed() {
+  $vol = civicrm_api3('Extension', 'get', array(
+    'return' => array("id"),
+    'key' => "org.civicrm.volunteer",
+    'status' => "installed",
+  ));
+  return ($vol['count'] > 0);
+}
+
+
+/**
+ * Utility function to get the Volunteer Activity type
+ */
+function sumfields_volunteer_activity_id() {
+  return sumfields_get_option_value_id("activity_type", "Volunteer");
+}
+
+/**
+ * Utility function to fetch activity assignee record_type_id
+ */
+function sumfields_activity_assignee_record_type() {
+  return sumfields_get_option_value_id("activity_contacts", "Activity Assignees");
+}
+
+/**
+ * Utility function for fetching optionValue IDs
+ * @param $groupName
+ * @param $valueName
+ * @return mixed
+ *  Either the id of the requested option value, or false if it can't be found.
+ */
+function sumfields_get_option_value_id($groupName, $valueName) {
+  $optionGroup = civicrm_api3('OptionGroup', 'getsingle', array(
+    'name' => $groupName,
+    'return' => 'id'
+  ));
+
+  try {
+    $optionValue = civicrm_api3('OptionValue', 'getsingle', array(
+      'name' => $valueName,
+      'option_group_id' => $optionGroup['id'],
+      'return' => 'value'
+    ));
+    return $optionValue['value'];
+  } catch(Exception $e) {
+    return false;
   }
 }
