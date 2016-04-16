@@ -1442,7 +1442,8 @@ function sumfields_volunteer_installed() {
  * Utility function to get the Volunteer Activity type
  */
 function sumfields_volunteer_activity_id() {
-  return sumfields_get_option_value_id("activity_type", "Volunteer");
+  return 56;
+  //return sumfields_get_option_value_id("activity_type", "Volunteer");
 }
 
 /**

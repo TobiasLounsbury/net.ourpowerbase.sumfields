@@ -109,15 +109,14 @@ class CRM_Sumfields_Form_SumFields extends CRM_Core_Form {
 
 
 
-    if(sumfields_volunteer_installed()) {
+    //if(sumfields_volunteer_installed()) {
       $this->Assign('sumfields_active_volunteer', TRUE);
       $label = ts('Volunteer Fields', array('domain' => 'net.ourpowerbase.sumfields'));
       $name = 'active_volunteer_fields';
       $this->addCheckBox(
         $name, $label, array_flip($field_options['volunteer'])
       );
-
-    }
+    //}
 
     if(sumfields_component_enabled('CiviMember')) {
       $this->assign('sumfields_member', TRUE);
