@@ -107,6 +107,18 @@ class CRM_Sumfields_Form_SumFields extends CRM_Core_Form {
       );
     }
 
+
+
+    if(sumfields_volunteer_installed()) {
+      $this->Assign('sumfields_active_volunteer', TRUE);
+      $label = ts('Volunteer Fields', array('domain' => 'net.ourpowerbase.sumfields'));
+      $name = 'active_volunteer_fields';
+      $this->addCheckBox(
+        $name, $label, array_flip($field_options['volunteer'])
+      );
+
+    }
+
     if(sumfields_component_enabled('CiviMember')) {
       $this->assign('sumfields_member', TRUE);
       $name = 'membership_financial_type_ids';
@@ -185,6 +197,7 @@ class CRM_Sumfields_Form_SumFields extends CRM_Core_Form {
     $active_membership_fields = array();
     $active_event_standard_fields = array();
     $active_event_turnout_fields = array();
+    $active_volunteer_fields = array();
     while(list($field,$field_info) = each($custom['fields'])) {
       if(in_array($field, $active_fields)) {
         if($field_info['display'] == 'fundraising') {
@@ -199,12 +212,16 @@ class CRM_Sumfields_Form_SumFields extends CRM_Core_Form {
         elseif($field_info['display'] == 'event_turnout') {
           $active_event_turnout_fields[] = $field;
         }
+        elseif($field_info['display'] == 'volunteer') {
+          $active_volunteer_fields[] = $field;
+        }
       }
     } 
     $defaults['active_fundraising_fields'] = $this->array_to_options($active_fundraising_fields);
     $defaults['active_membership_fields'] = $this->array_to_options($active_membership_fields);
     $defaults['active_event_standard_fields'] = $this->array_to_options($active_event_standard_fields);
     $defaults['active_event_turnout_fields'] = $this->array_to_options($active_event_turnout_fields);
+    $defaults['active_volunteer_fields'] = $this->array_to_options($active_volunteer_fields);
 
 
     $defaults['active_fields'] = $this->array_to_options(sumfields_get_setting('active_fields', array()));
@@ -233,6 +250,9 @@ class CRM_Sumfields_Form_SumFields extends CRM_Core_Form {
     }
     if(array_key_exists('active_event_turnout_fields', $values)) {
       $active_fields = $active_fields + $values['active_event_turnout_fields'];
+    }
+    if(array_key_exists('active_volunteer_fields', $values)) {
+      $active_fields = $active_fields + $values['active_volunteer_fields'];
     }
     if(count($active_fields) > 0) {
       $current_active_fields = sumfields_get_setting('active_fields', array());

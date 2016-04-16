@@ -44,6 +44,13 @@
     <td>{$form.active_event_turnout_fields.html}</td>
   </tr> 
   {/if}
+  {if $sumfields_active_volunteer }
+    <tr class="crm-sumfields-form-block-sumfields_active_volunteer_fields">
+      <td class="label">{$form.active_volunteer_fields.label}</td>
+      <td>{$form.active_volunteer_fields.html}</td>
+    </tr>
+  {/if}
+
   {if $sumfields_contribute}
     <tr>
       <td colspan="2" class="description">{ts}Please indicate the financial types you would like included when calculating contribution related summary fields.{/ts}</td>
