@@ -402,7 +402,7 @@ function sumfields_create_temporary_table($trigger_table) {
           $data_type = 'varchar(128)';
         }
         elseif($data_type == 'Number') {
-          $data_type = 'Decimal';
+          $data_type = 'DECIMAL(10,2)';
         }
         $create_fields[] = "`$field_name` $data_type";
       }

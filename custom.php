@@ -527,7 +527,7 @@ $custom = array(
 			'is_view' => '1',
 			'text_length' => '32',
 
-			'trigger_sql' => '(SELECT COALESCE(SUM(duration),0)
+			'trigger_sql' => '(SELECT COALESCE(SUM(duration) / 60,0)
 				FROM civicrm_activity t1
 				JOIN civicrm_activity_contact t3 ON t1.id = t3.activity_id AND t3.record_type_id = %activity_assignee_record_type
 				WHERE t1.activity_type_id = %volunteer_activity_type AND
