@@ -402,7 +402,7 @@ function sumfields_create_temporary_table($trigger_table) {
           $data_type = 'varchar(128)';
         }
         elseif($data_type == 'Number') {
-          $data_type = 'DECIMAL(10,2)';
+          $data_type = "DECIMAL(10,2)";
         }
         $create_fields[] = "`$field_name` $data_type";
       }
@@ -1477,6 +1477,19 @@ function sumfields_get_option_value_id($groupName, $valueName) {
   }
 }
 
+
+/**
+ * Helper function to artificially trigger trigger sql
+ * Used for when a trigger cannot fire for some reason
+ * Example: Activities don't fire triggers AFTER DELETE
+ * because mysql doesn't support both cascade deletes and
+ * after delete triggers
+ *
+ * @param $table
+ * @param $contactIds
+ * @param string $when
+ * @param string $event
+ */
 function _sumfields_recalculate($table, $contactIds, $when = "AFTER", $event = "DELETE") {
 
   $triggers = array();
@@ -1504,6 +1517,19 @@ function _sumfields_recalculate($table, $contactIds, $when = "AFTER", $event = "
   }
 }
 
+
+/**
+ * Implementation of CiviCRM's Pre hook
+ * Collects the IDs of contacts that need to be updated
+ * for this event.
+ * Used in conjunction with post to trigger events that
+ * conflict with mysql's lack of support for "combo moves"
+ *
+ * @param $op
+ * @param $objectName
+ * @param $id
+ * @param $params
+ */
 function sumfields_civicrm_pre($op, $objectName, $id, &$params) {
   global $sumfields_activity_delete_contact_ids;
   if ($op == "delete" && $objectName == "Activity") {
@@ -1513,6 +1539,19 @@ function sumfields_civicrm_pre($op, $objectName, $id, &$params) {
   }
 }
 
+
+/**
+ * Implementation of CiviCRM's Post hook
+ *
+ * Used to trigger on table/event combinations that
+ * are unsupported by MySQL, for various reasons, including
+ * cascading deletes
+ *
+ * @param $op
+ * @param $objectName
+ * @param $objectId
+ * @param $objectRef
+ */
 function sumfields_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   global $sumfields_activity_delete_contact_ids;
   if ($op == "delete" && $objectName == "Activity") {
