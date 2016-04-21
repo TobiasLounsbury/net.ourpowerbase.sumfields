@@ -532,7 +532,7 @@ $custom = array(
 				JOIN civicrm_activity_contact t3 ON t1.id = t3.activity_id AND t3.record_type_id = %activity_assignee_record_type
 				WHERE t1.activity_type_id = %volunteer_activity_type AND
 				CAST(t1.activity_date_time AS DATE) >= "%previous_12_months" AND
-				t3.contact_id = t2.contact_id AND
+				t3.contact_id = NEW.contact_id AND
 				t1.is_deleted = 0)',
 			'trigger_table' => 'civicrm_activity_contact',
 			'display' => 'volunteer',
