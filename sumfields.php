@@ -1476,3 +1476,48 @@ function sumfields_get_option_value_id($groupName, $valueName) {
     return false;
   }
 }
+
+function _sumfields_recalculate($table, $contactIds, $when = "AFTER", $event = "DELETE") {
+
+  $triggers = array();
+  sumfields_civicrm_triggerInfo($triggers, $table);
+  foreach ($triggers as $trigger) {
+    if ($trigger['when'] == $when && $trigger['event'] == $event) {
+      foreach ($contactIds as $contactId) {
+        $sql = $trigger['sql'];
+
+        if ($event == "DELETE") {
+          $sql = str_replace("OLD.contact_id", $contactId, $sql);
+        } else {
+          $sql = str_replace("NEW.contact_id", $contactId, $sql);
+        }
+
+        try {
+          CRM_Core_DAO::executeQuery($sql);
+        } catch (Exception $e) {
+          //Let the user know there has been an error.
+          //todo: Add checking to see what level of error message we should display.
+          CRM_Core_Session::singleton()->setStatus($e->getMessage(), "Summary Fields Error", "error");
+        }
+      }
+    }
+  }
+}
+
+function sumfields_civicrm_pre($op, $objectName, $id, &$params) {
+  global $sumfields_activity_delete_contact_ids;
+  if ($op == "delete" && $objectName == "Activity") {
+    //Fetch all contact Ids associated with this activity.
+    $rType = sumfields_activity_assignee_record_type();
+    $sumfields_activity_delete_contact_ids = CRM_Activity_BAO_ActivityContact::retrieveContactIdsByActivityId($id, $rType);
+  }
+}
+
+function sumfields_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+  global $sumfields_activity_delete_contact_ids;
+  if ($op == "delete" && $objectName == "Activity") {
+    if (isset($sumfields_activity_delete_contact_ids) && !empty($sumfields_activity_delete_contact_ids)) {
+      _sumfields_recalculate("civicrm_activity_contact", $sumfields_activity_delete_contact_ids);
+    }
+  }
+}
